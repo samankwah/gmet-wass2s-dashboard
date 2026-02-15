@@ -1,6 +1,6 @@
 import streamlit as st
 from pathlib import Path
-import json
+import sys
 
 st.set_page_config(
     page_title="GMet WASS2S Forecast Dashboard",
@@ -9,102 +9,106 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-APP_DIR = Path(__file__).parent
-ASSETS_DIR = APP_DIR / "assets"
-DATA_DIR = APP_DIR / "data"
+# Ensure utils is importable
+sys.path.insert(0, str(Path(__file__).parent))
+from utils import inject_css, sidebar_branding, page_header, info_bar, section_heading, status_badge, footer
+from utils.data_loader import get_metadata, find_forecast_file, load_netcdf
+from utils.charts import forecast_heatmap
+from utils.product_config import get_product
 
-# --- Sidebar branding ---
-with st.sidebar:
-    logo_path = ASSETS_DIR / "smart_logo_GMet.png"
-    cilss_path = ASSETS_DIR / "cilss.png"
-    if logo_path.exists():
-        st.image(str(logo_path), width=180)
-    if cilss_path.exists():
-        st.image(str(cilss_path), width=120)
-    st.markdown("---")
-    st.markdown("**Ghana Meteorological Agency**")
-    st.markdown("Sub-Seasonal to Seasonal Forecasts")
+inject_css()
+sidebar_branding()
 
-# --- Main page ---
-st.title("WASS2S Agrometeorological Forecast Dashboard")
-st.markdown("### Ghana Meteorological Agency (GMet)")
+# --- Hero banner ---
+page_header(
+    title="WASS2S Agrometeorological Forecast Dashboard",
+    subtitle="Ghana Meteorological Agency (GMet) — Sub-Seasonal to Seasonal Forecasts",
+    accent="#1B5E20",
+)
 
-# Load metadata if available
-metadata_path = DATA_DIR / "metadata.json"
-if metadata_path.exists():
-    with open(metadata_path) as f:
-        meta = json.load(f)
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Forecast Year", meta.get("forecast_year", "—"))
-    col2.metric("Initialization", meta.get("initialization", "—"))
-    col3.metric("Last Updated", meta.get("last_updated", "—"))
+# --- How to use ---
+with st.expander("How to use this dashboard"):
+    st.markdown("""
+1. **Select a product** from the sidebar — expand any category to see sub-items
+2. **Choose your season** and initialization month on the product page
+3. **Explore the map** — hover for grid-cell values, zoom into your region
+4. **Download data** — use the export buttons on each product page
+    """)
+
+# --- Info bar ---
+meta = get_metadata()
+if meta:
+    info_bar([
+        ("Forecast Year", str(meta.get("forecast_year", "—"))),
+        ("Initialization", str(meta.get("initialization", "—"))),
+    ])
 else:
-    st.info("No forecast data loaded yet. Run the pipeline to generate forecasts.")
+    st.info("No forecast data found. Ensure an Agro_PRESAGG_YYYY_ic_N/ directory exists.")
 
-st.markdown("---")
-
-# --- Product overview ---
-st.subheader("Available Forecast Products")
-
+# --- Reference tables ---
 col1, col2 = st.columns(2)
 
 with col1:
-    st.markdown("#### Agronomic Indices")
+    section_heading("Agronomic Indices")
+    st.caption("Key parameters for planting decisions")
     st.markdown("""
-    | Product | Description |
-    |---------|-------------|
-    | **Onset** | Rainfall onset date — planting guidance |
-    | **1st Dry Spell** | First dry spell after onset |
-    | **2nd/Late Dry Spell** | Second or late-season dry spell |
-    | **Cessation** | Rainfall cessation date (end of season) |
-    | **Length of Season** | Duration from onset to cessation |
-    """)
+| Product | What it tells you |
+|---------|-------------------|
+| **Onset** | Planting window |
+| **1st Dry Spell** | First dry period risk |
+| **Late Dry Spell** | Late-season drought risk |
+| **Cessation** | When rains end |
+| **Season Length** | Growing window |
+""")
 
 with col2:
-    st.markdown("#### Seasonal Forecasts")
+    section_heading("Seasonal Forecasts")
+    st.caption("3-month outlook products")
     st.markdown("""
-    | Season | Months | Products |
-    |--------|--------|----------|
-    | **MAM** | Mar–May | PRCP & TEMP |
-    | **AMJ** | Apr–Jun | PRCP & TEMP |
-    | **MJJ** | May–Jul | PRCP & TEMP |
-    | **JJA** | Jun–Aug | PRCP & TEMP |
-    | **JAS** | Jul–Sep | PRCP & TEMP |
-    | **SON** | Sep–Nov | PRCP & TEMP |
-    | **DJF** | Dec–Feb | PRCP & TEMP |
-    """)
+| Season | Months | Products |
+|--------|--------|----------|
+| **MAM** | Mar–May | PRCP & TEMP |
+| **JJA** | Jun–Aug | PRCP & TEMP |
+| **SON** | Sep–Nov | PRCP & TEMP |
+""")
+    with st.expander("All seasons"):
+        st.markdown("""
+| Season | Months | Products |
+|--------|--------|----------|
+| **AMJ** | Apr–Jun | PRCP & TEMP |
+| **MJJ** | May–Jul | PRCP & TEMP |
+| **JAS** | Jul–Sep | PRCP & TEMP |
+| **DJF** | Dec–Feb | PRCP & TEMP |
+""")
 
+# --- Consolidated forecasts ---
 st.markdown("---")
-
-# --- Quick links to consolidated forecast images ---
-st.subheader("Latest Consolidated Forecasts")
-
-FORECAST_DIR = Path("Agro_PRESAGG_2026_ic_1/forecasts")
+badge = status_badge("Updated Jan 2026")
+st.markdown(f'<div class="section-heading">Latest Consolidated Forecasts {badge}</div>', unsafe_allow_html=True)
 
 tab_onset, tab_dryspell = st.tabs(["Onset", "Dry Spell"])
 
-with tab_onset:
-    onset_img = FORECAST_DIR / "Consolidated Forecast Onset-2025.png"
-    if onset_img.exists():
-        st.image(str(onset_img), caption="Consolidated Onset Forecast", width="stretch")
-    else:
-        # Try data dir
-        data_img = DATA_DIR / "onset" / "consolidated_forecast.png"
-        if data_img.exists():
-            st.image(str(data_img), caption="Consolidated Onset Forecast", width="stretch")
+for tab, product_key, label in [(tab_onset, "onset", "Onset"), (tab_dryspell, "dry_spell", "Dry Spell")]:
+    with tab:
+        P = get_product(product_key)
+        data_file = find_forecast_file(product_key, "det")
+        if data_file:
+            data, lat, lon, ds = load_netcdf(str(data_file), deterministic=True)
+            if data is not None:
+                fig = forecast_heatmap(
+                    data.values, lon, lat, P["colorscale"], P["colorbar_title"],
+                    f"Consolidated {label} Forecast",
+                )
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info(f"No consolidated {label.lower()} forecast data found.")
         else:
-            st.info("Run the pipeline to generate onset forecast maps.")
+            # Fallback to static image
+            img_file = find_forecast_file(product_key, "image")
+            if img_file:
+                _, c, _ = st.columns([1, 2, 1])
+                c.image(str(img_file), caption=f"Consolidated {label} Forecast", use_container_width=True)
+            else:
+                st.info(f"No consolidated {label.lower()} forecast found.")
 
-with tab_dryspell:
-    ds_img = FORECAST_DIR / "Consolidated Forecast dryspellonset-2025.png"
-    if ds_img.exists():
-        st.image(str(ds_img), caption="Consolidated Dry Spell Onset Forecast", width="stretch")
-    else:
-        data_img = DATA_DIR / "dry_spell" / "consolidated_forecast.png"
-        if data_img.exists():
-            st.image(str(data_img), caption="Consolidated Dry Spell Onset Forecast", width="stretch")
-        else:
-            st.info("Run the pipeline to generate dry spell forecast maps.")
-
-st.markdown("---")
-st.caption("Powered by WASS2S | CILSS/AGRHYMET RCC | Ghana Meteorological Agency")
+footer()
