@@ -1,14 +1,21 @@
 """Cached NetCDF/CSV loading with auto-detection of Agro_PRESAGG data directories."""
 
 import re
+import io
+import zipfile
+import tempfile
 from pathlib import Path
 from typing import Optional
 import streamlit as st
 import xarray as xr
 import numpy as np
+import requests
 
 APP_DIR = Path(__file__).parent.parent
 PROJECT_ROOT = APP_DIR.parent
+
+GITHUB_REPO = "samankwah/gmet-wass2s-dashboard"
+RELEASE_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 
 
 def detect_data_dir() -> Optional[Path]:
@@ -27,8 +34,45 @@ def detect_data_dir() -> Optional[Path]:
 
 
 @st.cache_resource
+def _ensure_data_available():
+    """Download data from GitHub Releases if no local data directory exists."""
+    if detect_data_dir() is not None:
+        return  # Local data already present
+
+    try:
+        with st.spinner("Downloading forecast data (first run only)..."):
+            resp = requests.get(RELEASE_API_URL, timeout=30)
+            resp.raise_for_status()
+            release = resp.json()
+
+            # Find the first .zip asset
+            zip_url = None
+            for asset in release.get("assets", []):
+                if asset["name"].endswith(".zip"):
+                    zip_url = asset["browser_download_url"]
+                    break
+
+            if zip_url is None:
+                st.warning("No data zip found in latest GitHub release.")
+                return
+
+            # Download the zip
+            dl = requests.get(zip_url, timeout=600, stream=True)
+            dl.raise_for_status()
+
+            # Read into memory and extract
+            data = io.BytesIO(dl.content)
+            with zipfile.ZipFile(data) as zf:
+                zf.extractall(PROJECT_ROOT)
+
+    except Exception as e:
+        st.warning(f"Could not download data: {e}")
+
+
+@st.cache_resource
 def get_data_dirs():
     """Return cached (data_root, forecast_dir, score_dir, obs_dir) paths."""
+    _ensure_data_available()
     root = detect_data_dir()
     if root is None:
         return None, None, None, None
