@@ -12,70 +12,76 @@ import requests
 
 APP_DIR = Path(__file__).parent.parent
 PROJECT_ROOT = APP_DIR.parent
+DATA_DIR = Path("/tmp/wass2s_data")  # Writable on Streamlit Cloud
 
 GITHUB_REPO = "samankwah/gmet-wass2s-dashboard"
 RELEASE_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 
+_AGRO_PATTERN = re.compile(r"Agro_PRESAGG_(\d+)_ic_(\d+)")
+
 
 def detect_data_dir() -> Optional[Path]:
-    """Scan project root for Agro_PRESAGG_*_ic_*/ and return the latest match."""
-    pattern = re.compile(r"Agro_PRESAGG_(\d+)_ic_(\d+)")
+    """Scan search paths for Agro_PRESAGG_*_ic_*/ and return the latest match."""
     candidates = []
-    for d in PROJECT_ROOT.iterdir():
-        if d.is_dir():
-            m = pattern.match(d.name)
-            if m:
-                candidates.append((int(m.group(1)), int(m.group(2)), d))
+    for search_root in [PROJECT_ROOT, DATA_DIR]:
+        if not search_root.exists():
+            continue
+        for d in search_root.iterdir():
+            if d.is_dir():
+                m = _AGRO_PATTERN.match(d.name)
+                if m:
+                    candidates.append((int(m.group(1)), int(m.group(2)), d))
     if not candidates:
         return None
     candidates.sort(key=lambda x: (x[0], x[1]), reverse=True)
     return candidates[0][2]
 
 
-@st.cache_resource
-def _ensure_data_available():
+def _download_release_data():
     """Download data from GitHub Releases if no local data directory exists."""
     if detect_data_dir() is not None:
-        return  # Local data already present
+        return
 
     try:
-        with st.spinner("Downloading forecast data (first run only)..."):
-            resp = requests.get(RELEASE_API_URL, timeout=30)
-            resp.raise_for_status()
-            release = resp.json()
+        resp = requests.get(RELEASE_API_URL, timeout=30)
+        resp.raise_for_status()
+        release = resp.json()
 
-            # Find the first .zip asset
-            zip_url = None
-            for asset in release.get("assets", []):
-                if asset["name"].endswith(".zip"):
-                    zip_url = asset["browser_download_url"]
-                    break
+        # Find the first .zip asset
+        zip_url = None
+        for asset in release.get("assets", []):
+            if asset["name"].endswith(".zip"):
+                zip_url = asset["browser_download_url"]
+                break
 
-            if zip_url is None:
-                st.warning("No data zip found in latest GitHub release.")
-                return
+        if zip_url is None:
+            st.error("No data zip found in latest GitHub release.")
+            return
 
-            # Download the zip to a temp file (avoids loading 200MB+ into RAM)
-            with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as tmp:
-                tmp_path = tmp.name
-                with requests.get(zip_url, timeout=600, stream=True) as dl:
-                    dl.raise_for_status()
-                    for chunk in dl.iter_content(chunk_size=8 * 1024 * 1024):
-                        tmp.write(chunk)
+        # Download the zip to a temp file (avoids loading 200MB+ into RAM)
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(suffix=".zip", delete=False, dir="/tmp") as tmp:
+            tmp_path = tmp.name
+            with requests.get(zip_url, timeout=600, stream=True) as dl:
+                dl.raise_for_status()
+                for chunk in dl.iter_content(chunk_size=8 * 1024 * 1024):
+                    tmp.write(chunk)
 
-            # Extract and clean up
-            with zipfile.ZipFile(tmp_path) as zf:
-                zf.extractall(PROJECT_ROOT)
-            Path(tmp_path).unlink(missing_ok=True)
+        # Extract and clean up
+        with zipfile.ZipFile(tmp_path) as zf:
+            zf.extractall(DATA_DIR)
+        Path(tmp_path).unlink(missing_ok=True)
 
     except Exception as e:
-        st.warning(f"Could not download data: {e}")
+        st.error(f"Could not download data: {e}")
 
 
 @st.cache_resource
 def get_data_dirs():
     """Return cached (data_root, forecast_dir, score_dir, obs_dir) paths."""
-    _ensure_data_available()
+    if detect_data_dir() is None:
+        with st.spinner("Downloading forecast data (first run only)..."):
+            _download_release_data()
     root = detect_data_dir()
     if root is None:
         return None, None, None, None
