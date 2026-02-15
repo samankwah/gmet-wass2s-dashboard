@@ -1,7 +1,6 @@
 """Cached NetCDF/CSV loading with auto-detection of Agro_PRESAGG data directories."""
 
 import re
-import io
 import zipfile
 import tempfile
 from pathlib import Path
@@ -56,14 +55,18 @@ def _ensure_data_available():
                 st.warning("No data zip found in latest GitHub release.")
                 return
 
-            # Download the zip
-            dl = requests.get(zip_url, timeout=600, stream=True)
-            dl.raise_for_status()
+            # Download the zip to a temp file (avoids loading 200MB+ into RAM)
+            with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as tmp:
+                tmp_path = tmp.name
+                with requests.get(zip_url, timeout=600, stream=True) as dl:
+                    dl.raise_for_status()
+                    for chunk in dl.iter_content(chunk_size=8 * 1024 * 1024):
+                        tmp.write(chunk)
 
-            # Read into memory and extract
-            data = io.BytesIO(dl.content)
-            with zipfile.ZipFile(data) as zf:
+            # Extract and clean up
+            with zipfile.ZipFile(tmp_path) as zf:
                 zf.extractall(PROJECT_ROOT)
+            Path(tmp_path).unlink(missing_ok=True)
 
     except Exception as e:
         st.warning(f"Could not download data: {e}")
