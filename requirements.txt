@@ -4,3 +4,4 @@ xarray>=2024.1.0
 netCDF4>=1.6.0
 pandas>=2.0.0
 numpy>=1.24.0
+shapely>=2.0.0
