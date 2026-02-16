@@ -249,89 +249,82 @@ def inject_css():
     """, unsafe_allow_html=True)
 
 
-def sidebar_branding():
+def sidebar_branding(page_id=None):
     """Render sidebar with structured navigation and branding."""
+    params = dict(st.query_params)
+
+    def _check(page, param_key, param_val):
+        """Return ☑ if this link matches current page+param, else ☐."""
+        if page_id == page and params.get(param_key) == param_val:
+            return "\u2611"
+        return "\u2610"
+
     with st.sidebar:
         assets = Path(__file__).parent.parent / "assets"
         logo = assets / "smart_logo_GMet.png"
-        st.caption("WASS2S Forecast Dashboard")
+        # GMet logo at top — issuing agency identity first
+        if logo.exists():
+            st.image(str(logo), width=80)
+        st.caption("GMet Sub-Seasonal to Seasonal Forecasts")
 
         # MAIN MENU section
         st.markdown('<p class="sidebar-section">Main Menu</p>', unsafe_allow_html=True)
-        st.page_link("app.py", label="Dashboard", icon="\U0001F4CA")
+        st.page_link("app.py", label="Dashboard")
 
-        with st.expander("\U0001F331 Agronomic Forecasts"):
-            st.page_link("pages/01_Agronomic_Forecasts.py", label="\u25AA Onset", query_params={"product": "onset"})
-            st.page_link("pages/01_Agronomic_Forecasts.py", label="\u25AA 1st Dry Spell", query_params={"product": "dry_spell"})
-            st.page_link("pages/01_Agronomic_Forecasts.py", label="\u25AA Late Dry Spell", query_params={"product": "late_dry_spell"})
-            st.page_link("pages/01_Agronomic_Forecasts.py", label="\u25AA Cessation", query_params={"product": "cessation"})
-            st.page_link("pages/01_Agronomic_Forecasts.py", label="\u25AA Season Length", query_params={"product": "length_of_season"})
+        with st.expander("Agronomic Forecasts", expanded=(page_id == "agronomic")):
+            st.page_link("pages/01_Agronomic_Forecasts.py", label=f"{_check('agronomic', 'product', 'onset')} Onset", query_params={"product": "onset"})
+            st.page_link("pages/01_Agronomic_Forecasts.py", label=f"{_check('agronomic', 'product', 'dry_spell')} 1st Dry Spell", query_params={"product": "dry_spell"})
+            st.page_link("pages/01_Agronomic_Forecasts.py", label=f"{_check('agronomic', 'product', 'late_dry_spell')} Late Dry Spell", query_params={"product": "late_dry_spell"})
+            st.page_link("pages/01_Agronomic_Forecasts.py", label=f"{_check('agronomic', 'product', 'cessation')} Cessation", query_params={"product": "cessation"})
+            st.page_link("pages/01_Agronomic_Forecasts.py", label=f"{_check('agronomic', 'product', 'length_of_season')} Season Length", query_params={"product": "length_of_season"})
 
-        with st.expander("\U0001F327\uFE0F Rainfall Outlook"):
+        with st.expander("Rainfall Outlook", expanded=(page_id == "rainfall")):
             st.caption("Major Season (South)")
-            st.page_link("pages/02_Rainfall_Outlook.py", label="\u25AA MAM", query_params={"product": "MAM"})
-            st.page_link("pages/02_Rainfall_Outlook.py", label="\u25AA AMJ", query_params={"product": "AMJ"})
-            st.page_link("pages/02_Rainfall_Outlook.py", label="\u25AA MJJ", query_params={"product": "MJJ"})
+            st.page_link("pages/02_Rainfall_Outlook.py", label=f"{_check('rainfall', 'product', 'MAM')} MAM", query_params={"product": "MAM"})
+            st.page_link("pages/02_Rainfall_Outlook.py", label=f"{_check('rainfall', 'product', 'AMJ')} AMJ", query_params={"product": "AMJ"})
+            st.page_link("pages/02_Rainfall_Outlook.py", label=f"{_check('rainfall', 'product', 'MJJ')} MJJ", query_params={"product": "MJJ"})
             st.caption("Major Season (North)")
-            st.page_link("pages/02_Rainfall_Outlook.py", label="\u25AA MJJ", query_params={"product": "MJJ"})
-            st.page_link("pages/02_Rainfall_Outlook.py", label="\u25AA JJA", query_params={"product": "JJA"})
-            st.page_link("pages/02_Rainfall_Outlook.py", label="\u25AA JAS", query_params={"product": "JAS"})
+            st.page_link("pages/02_Rainfall_Outlook.py", label=f"{_check('rainfall', 'product', 'MJJ')} MJJ", query_params={"product": "MJJ"})
+            st.page_link("pages/02_Rainfall_Outlook.py", label=f"{_check('rainfall', 'product', 'JJA')} JJA", query_params={"product": "JJA"})
+            st.page_link("pages/02_Rainfall_Outlook.py", label=f"{_check('rainfall', 'product', 'JAS')} JAS", query_params={"product": "JAS"})
             st.caption("Minor Season (South)")
-            st.page_link("pages/02_Rainfall_Outlook.py", label="\u25AA SON", query_params={"product": "SON"})
+            st.page_link("pages/02_Rainfall_Outlook.py", label=f"{_check('rainfall', 'product', 'SON')} SON", query_params={"product": "SON"})
             st.caption("Dry Season (All)")
-            st.page_link("pages/02_Rainfall_Outlook.py", label="\u25AA NDJ", query_params={"product": "NDJ"})
+            st.page_link("pages/02_Rainfall_Outlook.py", label=f"{_check('rainfall', 'product', 'NDJ')} NDJ", query_params={"product": "NDJ"})
 
-        with st.expander("\U0001F321\uFE0F Temperature Outlook"):
+        with st.expander("Temperature Outlook", expanded=(page_id == "temperature")):
             st.caption("Major Season (South)")
-            st.page_link("pages/03_Temperature_Outlook.py", label="\u25AA MAM", query_params={"product": "MAM"})
-            st.page_link("pages/03_Temperature_Outlook.py", label="\u25AA AMJ", query_params={"product": "AMJ"})
-            st.page_link("pages/03_Temperature_Outlook.py", label="\u25AA MJJ", query_params={"product": "MJJ"})
+            st.page_link("pages/03_Temperature_Outlook.py", label=f"{_check('temperature', 'product', 'MAM')} MAM", query_params={"product": "MAM"})
+            st.page_link("pages/03_Temperature_Outlook.py", label=f"{_check('temperature', 'product', 'AMJ')} AMJ", query_params={"product": "AMJ"})
+            st.page_link("pages/03_Temperature_Outlook.py", label=f"{_check('temperature', 'product', 'MJJ')} MJJ", query_params={"product": "MJJ"})
             st.caption("Major Season (North)")
-            st.page_link("pages/03_Temperature_Outlook.py", label="\u25AA MJJ", query_params={"product": "MJJ"})
-            st.page_link("pages/03_Temperature_Outlook.py", label="\u25AA JJA", query_params={"product": "JJA"})
-            st.page_link("pages/03_Temperature_Outlook.py", label="\u25AA JAS", query_params={"product": "JAS"})
+            st.page_link("pages/03_Temperature_Outlook.py", label=f"{_check('temperature', 'product', 'MJJ')} MJJ", query_params={"product": "MJJ"})
+            st.page_link("pages/03_Temperature_Outlook.py", label=f"{_check('temperature', 'product', 'JJA')} JJA", query_params={"product": "JJA"})
+            st.page_link("pages/03_Temperature_Outlook.py", label=f"{_check('temperature', 'product', 'JAS')} JAS", query_params={"product": "JAS"})
             st.caption("Minor Season (South)")
-            st.page_link("pages/03_Temperature_Outlook.py", label="\u25AA SON", query_params={"product": "SON"})
+            st.page_link("pages/03_Temperature_Outlook.py", label=f"{_check('temperature', 'product', 'SON')} SON", query_params={"product": "SON"})
             st.caption("Dry Season (All)")
-            st.page_link("pages/03_Temperature_Outlook.py", label="\u25AA NDJ", query_params={"product": "NDJ"})
+            st.page_link("pages/03_Temperature_Outlook.py", label=f"{_check('temperature', 'product', 'NDJ')} NDJ", query_params={"product": "NDJ"})
 
         # ANALYSIS section
         st.markdown('<p class="sidebar-section">Analysis</p>', unsafe_allow_html=True)
 
-        with st.expander("\U0001F4C8 Forecast Skill"):
-            st.page_link("pages/04_Forecast_Skill.py", label="\u25AA GROC", query_params={"product": "GROC"})
-            st.page_link("pages/04_Forecast_Skill.py", label="\u25AA Pearson", query_params={"product": "Pearson"})
-            st.page_link("pages/04_Forecast_Skill.py", label="\u25AA MAE", query_params={"product": "MAE"})
-            st.page_link("pages/04_Forecast_Skill.py", label="\u25AA RPSS", query_params={"product": "RPSS"})
+        with st.expander("Forecast Skill", expanded=(page_id == "skill")):
+            st.page_link("pages/04_Forecast_Skill.py", label=f"{_check('skill', 'metric', 'GROC')} GROC", query_params={"metric": "GROC"})
+            st.page_link("pages/04_Forecast_Skill.py", label=f"{_check('skill', 'metric', 'Pearson')} Pearson", query_params={"metric": "Pearson"})
+            st.page_link("pages/04_Forecast_Skill.py", label=f"{_check('skill', 'metric', 'MAE')} MAE", query_params={"metric": "MAE"})
+            st.page_link("pages/04_Forecast_Skill.py", label=f"{_check('skill', 'metric', 'RPSS')} RPSS", query_params={"metric": "RPSS"})
 
-        with st.expander("\U0001F4CD Station Data"):
-            st.page_link("pages/05_Station_Data.py", label="\u25AA Onset", query_params={"product": "onset"})
-            st.page_link("pages/05_Station_Data.py", label="\u25AA Dry Spell", query_params={"product": "dry_spell"})
-            st.page_link("pages/05_Station_Data.py", label="\u25AA Seasonal PRCP", query_params={"product": "seasonal_prcp"})
+        with st.expander("Station Data", expanded=(page_id == "station")):
+            st.page_link("pages/05_Station_Data.py", label=f"{_check('station', 'product', 'onset')} Onset", query_params={"product": "onset"})
+            st.page_link("pages/05_Station_Data.py", label=f"{_check('station', 'product', 'dry_spell')} Dry Spell", query_params={"product": "dry_spell"})
+            st.page_link("pages/05_Station_Data.py", label=f"{_check('station', 'product', 'seasonal_prcp')} Seasonal PRCP", query_params={"product": "seasonal_prcp"})
 
         # HELP section
         st.markdown('<p class="sidebar-section">Help</p>', unsafe_allow_html=True)
-        with st.expander("Glossary"):
-            st.markdown("""
-**Initialization** — month when models were run
-**Skill Score** — forecast reliability (1993–2016)
-**Onset** — start of rainy season
-**Cessation** — end of rainy season
-**PRCP** — precipitation (rainfall)
-            """)
+        st.page_link("pages/06_Glossary.py", label="Glossary")
 
-        # GMet logo pinned to sidebar bottom corner
-        if logo.exists():
-            import base64
-            logo_bytes = logo.read_bytes()
-            b64 = base64.b64encode(logo_bytes).decode()
-            st.markdown(f"""
-            <div style="position:fixed; bottom:0.8rem; left:0.8rem; z-index:50;
-                        max-width:calc(var(--sidebar-width, 21rem) - 1.6rem);">
-                <hr style="border:none; border-top:1px solid #EEE; margin-bottom:0.5rem;">
-                <img src="data:image/png;base64,{b64}" width="70">
-            </div>
-            """, unsafe_allow_html=True)
+        st.markdown("---")
 
 
 def info_bar(items, accent="#1B5E20"):
@@ -358,7 +351,7 @@ def status_badge(text):
     return f'<span class="status-badge">{text}</span>'
 
 
-def page_header(title: str, subtitle: str, accent: str, icon: str = ""):
+def page_header(title: str, subtitle: str, accent: str):
     """Render a gradient banner at the top of a page."""
     st.markdown(f"""
     <div class="page-banner" style="
@@ -369,7 +362,7 @@ def page_header(title: str, subtitle: str, accent: str, icon: str = ""):
         color: white;
     ">
         <h1 style="margin:0; font-size:1.8rem; color:white;">
-            {icon} {title}
+            {title}
         </h1>
         <p style="margin:0.3rem 0 0; opacity:0.9; font-size:0.95rem; color: #ffffffdd;">
             {subtitle}
@@ -394,12 +387,12 @@ def metric_cards(values: list[tuple[str, str]], accent: str, light_bg: str):
 
 def about_product(description: str, farmer_guidance: str):
     """Render expandable about section with farmer guidance."""
-    with st.expander("About this product", expanded=False):
+    with st.expander("About This Product", expanded=False):
         st.markdown(description)
         if farmer_guidance:
             st.markdown(f"""
             <div class="farmer-tip">
-                <strong>\U0001F33E Farmer Guidance:</strong> {farmer_guidance}
+                <strong>Advisory Guidance for Farmers:</strong> {farmer_guidance}
             </div>
             """, unsafe_allow_html=True)
 
@@ -409,8 +402,43 @@ def footer():
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
     st.markdown(f"""
     <div class="app-footer">
-        Powered by <strong>WASS2S</strong> | CILSS/AGRHYMET RCC | Ghana Meteorological Agency<br>
+        <strong>Ghana Meteorological Agency (GMet)</strong> | CILSS/AGRHYMET Regional Climate Centre | WASS2S Forecast System<br>
         <span style="font-size:0.65rem;">Rendered {now} UTC</span>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+def disclaimer(description: str = None, farmer_guidance: str = None):
+    """Render a standard forecast disclaimer block with optional product info."""
+    product_html = ""
+    if description:
+        product_html += f"<p style='margin:0 0 0.5rem 0;'>{description}</p>"
+    if farmer_guidance:
+        product_html += (
+            f"<p style='margin:0 0 0.5rem 0;'>"
+            f"<strong>Advisory Guidance for Farmers:</strong> {farmer_guidance}</p>"
+        )
+    if product_html:
+        product_html += "<hr style='border:none;border-top:1px solid #E0D8A8;margin:0.5rem 0;'>"
+
+    st.markdown(f"""
+    <div style="
+        background: #FFFDE7;
+        border-left: 4px solid #F9A825;
+        padding: 0.8rem 1rem;
+        border-radius: 0 6px 6px 0;
+        margin-top: 1.5rem;
+        margin-bottom: 1rem;
+        font-size: 0.82rem;
+        color: #555;
+    ">
+        {product_html}
+        <strong style="color:#E65100;">Disclaimer:</strong>
+        These forecasts are produced by the WASS2S system using multi-model
+        ensemble techniques. They represent probabilistic guidance and should not be used
+        as the sole basis for decision-making. Local conditions may differ from regional-scale
+        forecasts. Users are advised to consult GMet extension services for location-specific
+        guidance. Forecast skill varies by region, season, and lead time.
     </div>
     """, unsafe_allow_html=True)
 
