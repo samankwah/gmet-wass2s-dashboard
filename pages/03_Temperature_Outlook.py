@@ -2,20 +2,18 @@ import streamlit as st
 import sys
 from pathlib import Path
 
-st.set_page_config(page_title="Temperature Outlook", page_icon="\U0001F321\uFE0F", layout="wide")
+_logo_path = Path(__file__).parent.parent / "assets" / "smart_logo_GMet.png"
+st.set_page_config(page_title="Temperature Outlook", page_icon=str(_logo_path) if _logo_path.exists() else None, layout="wide")
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from utils import inject_css, sidebar_branding, page_header, metric_cards, about_product, footer
+from utils import inject_css, sidebar_branding, metric_cards, footer, disclaimer
 from utils.product_config import get_product
 from utils.charts import forecast_heatmap
 from utils.data_loader import load_netcdf, load_probabilistic, compute_stats, format_metric, get_data_dirs
 
 P = get_product("seasonal_temp")
 inject_css()
-sidebar_branding()
-
-page_header(P["title"], "Seasonal temperature outlook for Ghana", P["accent"], P["icon"])
-about_product(P["description"], P["farmer_guidance"])
+sidebar_branding(page_id="temperature")
 
 SEASONS = {
     "MAM": "March \u2013 May",
@@ -27,14 +25,12 @@ SEASONS = {
     "DJF": "December \u2013 February",
 }
 
-col1, col2 = st.columns([1, 3])
-with col1:
-    season = st.selectbox("Select Season", list(SEASONS.keys()),
-                          format_func=lambda s: f"{s} ({SEASONS[s]})")
-with col2:
-    forecast_type = st.radio("Forecast Type", ["Deterministic", "Probabilistic"], horizontal=True)
+qp = st.query_params.get("product", "MAM")
+season = qp if qp in SEASONS else "MAM"
 
-st.markdown(f"### {season} \u2014 {SEASONS[season]}")
+st.markdown(f"### Seasonal Temperature Forecast \u2014 {season} ({SEASONS[season]})")
+
+forecast_type = st.radio("Forecast Type", ["Deterministic", "Probabilistic"], horizontal=True)
 
 data_root, forecast_dir, _, _ = get_data_dirs()
 
@@ -90,8 +86,9 @@ available = []
 for s in SEASONS:
     has_det = bool(forecast_dir and sorted(forecast_dir.glob(f"*Det*TEMP*{s}*.nc"))) if forecast_dir and forecast_dir.exists() else False
     has_prob = bool(forecast_dir and sorted(forecast_dir.glob(f"*Prob*TEMP*{s}*.nc"))) if forecast_dir and forecast_dir.exists() else False
-    status = "\u2705 Available" if (has_det or has_prob) else "\u274C Not yet generated"
+    status = "Available" if (has_det or has_prob) else "Not available"
     available.append({"Season": s, "Months": SEASONS[s], "Status": status})
 st.table(available)
 
+disclaimer(P["description"], P["farmer_guidance"])
 footer()

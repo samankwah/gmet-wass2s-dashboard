@@ -1,46 +1,42 @@
 import streamlit as st
 from pathlib import Path
+from datetime import datetime
 import sys
 
+_logo_path = Path(__file__).parent / "assets" / "smart_logo_GMet.png"
 st.set_page_config(
     page_title="GMet WASS2S Forecast Dashboard",
-    page_icon=":partly_sunny:",
+    page_icon=str(_logo_path) if _logo_path.exists() else None,
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 # Ensure utils is importable
 sys.path.insert(0, str(Path(__file__).parent))
-from utils import inject_css, sidebar_branding, page_header, info_bar, section_heading, status_badge, footer
+from utils import inject_css, sidebar_branding, info_bar, section_heading, status_badge, footer, disclaimer
 from utils.data_loader import get_metadata, find_forecast_file, load_netcdf
 from utils.charts import forecast_heatmap
 from utils.product_config import get_product
 
 inject_css()
-sidebar_branding()
+sidebar_branding(page_id="dashboard")
 
-# --- Hero banner ---
-page_header(
-    title="WASS2S Agrometeorological Forecast Dashboard",
-    subtitle="Ghana Meteorological Agency (GMet) — Sub-Seasonal to Seasonal Forecasts",
-    accent="#1B5E20",
-)
-
-# --- How to use ---
-with st.expander("How to use this dashboard"):
+# --- About this dashboard ---
+with st.expander("About This Dashboard"):
     st.markdown("""
-1. **Select a product** from the sidebar — expand any category to see sub-items
-2. **Choose your season** and initialization month on the product page
-3. **Explore the map** — hover for grid-cell values, zoom into your region
-4. **Download data** — use the export buttons on each product page
+This dashboard presents sub-seasonal to seasonal agrometeorological forecast products
+for Ghana, produced by the WASS2S system in collaboration with CILSS/AGRHYMET Regional
+Climate Centre. Use the sidebar to navigate forecast products.
     """)
 
 # --- Info bar ---
 meta = get_metadata()
 if meta:
     info_bar([
-        ("Forecast Year", str(meta.get("forecast_year", "—"))),
-        ("Initialization", str(meta.get("initialization", "—"))),
+        ("Issued By", "Ghana Meteorological Agency"),
+        ("Issue Date", datetime.now().strftime("%d %B %Y")),
+        ("Forecast Year", str(meta.get("forecast_year", "\u2014"))),
+        ("Initialization", str(meta.get("initialization", "\u2014"))),
     ])
 else:
     st.info("No forecast data found. Ensure an Agro_PRESAGG_YYYY_ic_N/ directory exists.")
@@ -49,42 +45,48 @@ else:
 col1, col2 = st.columns(2)
 
 with col1:
-    section_heading("Agronomic Indices")
-    st.caption("Key parameters for planting decisions")
-    st.markdown("""
-| Product | What it tells you |
-|---------|-------------------|
-| **Onset** | Planting window |
-| **1st Dry Spell** | First dry period risk |
-| **Late Dry Spell** | Late-season drought risk |
-| **Cessation** | When rains end |
-| **Season Length** | Growing window |
-""")
+    section_heading("Agronomic Indices", caption="Key parameters for planting decisions")
+    _agro_indices = [
+        ("Onset", "Planting window start date"),
+        ("1st Dry Spell", "First dry period risk"),
+        ("Late Dry Spell", "Late-season drought risk"),
+        ("Cessation", "When rains end"),
+        ("Season Length", "Total growing window"),
+    ]
+    _cards_html = "".join(
+        f'<div class="summary-card">'
+        f'<div class="sc-name">{name}</div>'
+        f'<div class="sc-desc">{desc}</div>'
+        f'</div>'
+        for name, desc in _agro_indices
+    )
+    st.html(_cards_html)
 
 with col2:
-    section_heading("Seasonal Forecasts")
-    st.caption("3-month outlook products")
-    st.markdown("""
-| Season | Months | Products |
-|--------|--------|----------|
-| **MAM** | Mar–May | PRCP & TEMP |
-| **JJA** | Jun–Aug | PRCP & TEMP |
-| **SON** | Sep–Nov | PRCP & TEMP |
-""")
-    with st.expander("All seasons"):
-        st.markdown("""
-| Season | Months | Products |
-|--------|--------|----------|
-| **AMJ** | Apr–Jun | PRCP & TEMP |
-| **MJJ** | May–Jul | PRCP & TEMP |
-| **JAS** | Jul–Sep | PRCP & TEMP |
-| **DJF** | Dec–Feb | PRCP & TEMP |
-""")
+    section_heading("Seasonal Forecasts", caption="3-month outlook products")
+    _season_groups = [
+        ("Major Season (South)", [("MAM", "Mar\u2013May"), ("AMJ", "Apr\u2013Jun"), ("MJJ", "May\u2013Jul")]),
+        ("Major Season (North)", [("MJJ", "May\u2013Jul"), ("JJA", "Jun\u2013Aug"), ("JAS", "Jul\u2013Sep")]),
+        ("Minor Season", [("SON", "Sep\u2013Nov")]),
+        ("Dry Season", [("DJF", "Dec\u2013Feb")]),
+    ]
+    _seasons_html = ""
+    for group_label, seasons in _season_groups:
+        _seasons_html += f'<div class="season-group-label">{group_label}</div>'
+        _seasons_html += '<div class="season-chips">'
+        for code, months in seasons:
+            _seasons_html += (
+                f'<span class="season-chip">'
+                f'<span class="sc-code">{code}</span>'
+                f'<span class="sc-months">{months}</span>'
+                f'</span>'
+            )
+        _seasons_html += '</div>'
+    st.html(_seasons_html)
 
 # --- Consolidated forecasts ---
 st.markdown("---")
-badge = status_badge("Updated Jan 2026")
-st.markdown(f'<div class="section-heading">Latest Consolidated Forecasts {badge}</div>', unsafe_allow_html=True)
+st.html('<div class="section-heading">Latest Consolidated Forecasts \u2014 Updated January 2026</div>')
 
 tab_onset, tab_dryspell = st.tabs(["Onset", "Dry Spell"])
 
@@ -98,6 +100,7 @@ for tab, product_key, label in [(tab_onset, "onset", "Onset"), (tab_dryspell, "d
                 fig = forecast_heatmap(
                     data.values, lon, lat, P["colorscale"], P["colorbar_title"],
                     f"Consolidated {label} Forecast",
+                    use_week_labels=P.get("use_week_labels", False),
                 )
                 st.plotly_chart(fig, use_container_width=True)
             else:
@@ -111,4 +114,6 @@ for tab, product_key, label in [(tab_onset, "onset", "Onset"), (tab_dryspell, "d
             else:
                 st.info(f"No consolidated {label.lower()} forecast found.")
 
+st.markdown("<br>", unsafe_allow_html=True)
+disclaimer()
 footer()

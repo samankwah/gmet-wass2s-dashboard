@@ -1,6 +1,7 @@
 """Plotly chart factory with Ghana outline overlay and consistent formatting."""
 
 import json
+from datetime import date, timedelta
 from pathlib import Path
 import plotly.graph_objects as go
 import numpy as np
@@ -126,6 +127,13 @@ def _add_ghana_outline(fig):
                 ))
 
 
+def _doy_to_week_label(doy, year=2026):
+    """Convert day-of-year to 'Wk1 May' format (week within the month)."""
+    d = date(year, 1, 1) + timedelta(days=int(doy) - 1)
+    week_num = (d.day - 1) // 7 + 1
+    return f"Wk{week_num} {d.strftime('%b')}"
+
+
 def forecast_heatmap(
     z: np.ndarray,
     x: np.ndarray,
@@ -137,36 +145,80 @@ def forecast_heatmap(
     zmax=None,
     height: int = 900,
     width: int = 1000,
+    valid_period: str = None,
+    forecast_year: int = None,
+    use_week_labels: bool = False,
 ) -> go.Figure:
     """Create a styled heatmap with Ghana outline overlay."""
     z = _apply_ghana_mask(z, x, y)
+
+    year = forecast_year or 2026
+
+    # Build colorbar kwargs
+    cb_kwargs = dict(
+        title=dict(text=colorbar_title, side="right"),
+        thickness=15,
+        len=0.75,
+    )
+
+    # Use integer format for Day of Year values
+    z_fmt = ":.0f" if colorbar_title == "Day of Year" else ":.2f"
+    hover_kwargs = dict(
+        hovertemplate=f"Longitude: %{{x:.2f}}<br>Latitude: %{{y:.2f}}<br>Value: %{{z{z_fmt}}}<extra></extra>",
+    )
+
+    if use_week_labels:
+        # Compute week-boundary tick values spanning the data range
+        valid = z[~np.isnan(z)]
+        if len(valid) > 0:
+            dmin, dmax = int(np.nanmin(valid)), int(np.nanmax(valid))
+            # Start at the first day-1 of each week boundary (every 7 days)
+            first_tick = (dmin // 7) * 7 + 1
+            tickvals = list(range(first_tick, dmax + 1, 7))
+            ticktext = [_doy_to_week_label(v, year) for v in tickvals]
+            cb_kwargs["tickvals"] = tickvals
+            cb_kwargs["ticktext"] = ticktext
+
+        # Build hover text matrix with week labels
+        hover_text = np.empty(z.shape, dtype=object)
+        for i in range(z.shape[0]):
+            for j in range(z.shape[1]):
+                if np.isnan(z[i, j]):
+                    hover_text[i, j] = ""
+                else:
+                    hover_text[i, j] = _doy_to_week_label(z[i, j], year)
+        hover_kwargs = dict(
+            hovertext=hover_text,
+            hovertemplate="Longitude: %{x:.2f}<br>Latitude: %{y:.2f}<br>%{hovertext}<extra></extra>",
+        )
+
     fig = go.Figure(data=go.Heatmap(
         z=z,
         x=x,
         y=y,
         colorscale=colorscale,
-        colorbar=dict(
-            title=dict(text=colorbar_title, side="right"),
-            thickness=15,
-            len=0.75,
-        ),
+        colorbar=cb_kwargs,
         zmin=zmin,
         zmax=zmax,
         hoverongaps=False,
-        hovertemplate="Lon: %{x:.2f}<br>Lat: %{y:.2f}<br>Value: %{z:.2f}<extra></extra>",
+        **hover_kwargs,
     ))
 
     _add_ghana_outline(fig)
     _add_station_labels(fig)
 
+    display_title = title
+    if valid_period:
+        display_title += f"<br><span style='font-size:14px;'>Valid: {valid_period}</span>"
+
     fig.update_layout(
-        title=dict(text=title, x=0.5, xanchor="center", font=dict(size=20)),
+        title=dict(text=display_title, x=0.5, xanchor="center", font=dict(size=20)),
         xaxis_title="Longitude (\u00b0E)",
         yaxis_title="Latitude (\u00b0N)",
         height=height,
         width=width,
         yaxis=dict(scaleanchor="x", scaleratio=1),
-        margin=dict(l=60, r=20, t=50, b=50),
+        margin=dict(l=60, r=20, t=70, b=90),
         plot_bgcolor="#fafafa",
         font=dict(size=14),
     )
@@ -220,6 +272,8 @@ def dominant_tercile_map(
     reverse_cmap: bool = False,
     height: int = 900,
     width: int = 1000,
+    valid_period: str = None,
+    category_labels: list = None,
 ) -> go.Figure:
     """Create a dominant tercile map with continuous color gradients.
 
@@ -229,6 +283,7 @@ def dominant_tercile_map(
     z encoding: BN prob -> 0+prob*100, NN -> 100+prob*100, AN -> 200+prob*100
     """
     cat_names = list(categories.keys())  # ["Below Normal", "Near Normal", "Above Normal"]
+    display_names = category_labels if category_labels else cat_names
     arrays = [categories[c] for c in cat_names]
     stacked = np.stack(arrays, axis=0)  # (3, lat, lon)
 
@@ -269,11 +324,11 @@ def dominant_tercile_map(
             else:
                 idx = dominant_idx[i, j]
                 hover_text[i, j] = (
-                    f"Category: {cat_names[idx]}<br>"
+                    f"Category: {display_names[idx]}<br>"
                     f"Probability: {max_prob[i, j]:.0%}"
                 )
 
-    # Build probability tick labels for colorbar
+    # Build percentage tick labels for the colorbar
     tickvals = []
     ticktext = []
     # BN: 35-85% in 10% steps (z range 0-100)
@@ -298,29 +353,30 @@ def dominant_tercile_map(
         zmax=300,
         hoverongaps=False,
         hovertext=hover_text,
-        hovertemplate="Lon: %{x:.2f}<br>Lat: %{y:.2f}<br>%{hovertext}<extra></extra>",
+        hovertemplate="Longitude: %{x:.2f}<br>Latitude: %{y:.2f}<br>%{hovertext}<extra></extra>",
         colorbar=dict(
             title=dict(text="Probability (%)", side="right"),
             thickness=15,
             len=0.75,
             tickvals=tickvals,
             ticktext=ticktext,
+            tickfont=dict(size=10),
         ),
     ))
 
-    # Add category name annotations next to colorbar
+    # Add category labels to the right of the colorbar via annotations
     # Colorbar spans y 0.125 to 0.875 (len=0.75 centered), each segment is 1/3 of that
     cb_bottom = 0.125
     cb_height = 0.75
     seg_height = cb_height / 3.0
-    for i, name in enumerate(cat_names):
+    for i, name in enumerate(display_names):
         mid_y = cb_bottom + (i + 0.5) * seg_height
         fig.add_annotation(
-            x=1.18,
+            x=1.22,
             y=mid_y,
             xref="paper",
             yref="paper",
-            text=f"<b>{name}</b>",
+            text=f"<b>{name}<br>(%)</b>",
             showarrow=False,
             font=dict(size=11),
             textangle=-90,
@@ -329,14 +385,77 @@ def dominant_tercile_map(
     _add_ghana_outline(fig)
     _add_station_labels(fig)
 
+    display_title = title
+    if valid_period:
+        display_title += f"<br><span style='font-size:14px;'>Valid: {valid_period}</span>"
+
     fig.update_layout(
-        title=dict(text=title, x=0.5, xanchor="center", font=dict(size=20)),
+        title=dict(text=display_title, x=0.5, xanchor="center", font=dict(size=20)),
         xaxis_title="Longitude (\u00b0E)",
         yaxis_title="Latitude (\u00b0N)",
         height=height,
         width=width,
         yaxis=dict(scaleanchor="x", scaleratio=1),
-        margin=dict(l=60, r=100, t=50, b=50),
+        margin=dict(l=60, r=140, t=70, b=90),
+        plot_bgcolor="#fafafa",
+        font=dict(size=14),
+    )
+
+    return fig
+
+
+def station_map(
+    station_names: list,
+    lats: list,
+    lons: list,
+    has_data: list,
+    title: str,
+    height: int = 700,
+    width: int = 900,
+) -> go.Figure:
+    """Create a scatter map of station locations on the Ghana outline.
+
+    Parameters
+    ----------
+    station_names : list of str
+    lats, lons : list of float
+    has_data : list of bool – True if the station has valid data
+    title : str – displayed above the map
+    """
+    fig = go.Figure()
+    _add_ghana_outline(fig)
+
+    colors = ["#2ca02c" if hd else "#d62728" for hd in has_data]
+    labels = ["Has data" if hd else "No data" for hd in has_data]
+
+    fig.add_trace(go.Scatter(
+        x=lons,
+        y=lats,
+        mode="markers+text",
+        marker=dict(size=9, color=colors, line=dict(width=0.5, color="black")),
+        text=station_names,
+        textfont=dict(size=9, color="black"),
+        textposition="top center",
+        hoverinfo="text",
+        hovertext=[
+            f"{n} ({la:.2f}\u00b0N, {lo:.2f}\u00b0E)<br>{lbl}"
+            for n, la, lo, lbl in zip(station_names, lats, lons, labels)
+        ],
+        showlegend=False,
+    ))
+
+    n_with = sum(has_data)
+    n_total = len(has_data)
+    display_title = f"{title} \u2014 {n_with} of {n_total} stations with data"
+
+    fig.update_layout(
+        title=dict(text=display_title, x=0.5, xanchor="center", font=dict(size=18)),
+        xaxis_title="Longitude (\u00b0E)",
+        yaxis_title="Latitude (\u00b0N)",
+        height=height,
+        width=width,
+        yaxis=dict(scaleanchor="x", scaleratio=1),
+        margin=dict(l=60, r=20, t=70, b=90),
         plot_bgcolor="#fafafa",
         font=dict(size=14),
     )

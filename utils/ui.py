@@ -8,7 +8,7 @@ from PIL import Image
 
 def inject_css():
     """Inject global CSS for professional styling."""
-    st.markdown("""
+    st.html("""
     <style>
     /* Sidebar — clean light theme */
     section[data-testid="stSidebar"] {
@@ -226,6 +226,57 @@ def inject_css():
     }
     .farmer-tip strong { color: #E65100; }
 
+    /* Summary cards — green left-border accent */
+    .summary-card {
+        border-left: 3px solid #2E7D32;
+        background: #F9FBF9;
+        padding: 0.5rem 0.8rem;
+        border-radius: 0 6px 6px 0;
+        margin-bottom: 0.45rem;
+    }
+    .summary-card .sc-name {
+        font-weight: 600;
+        font-size: 0.88rem;
+        color: #1B5E20;
+    }
+    .summary-card .sc-desc {
+        font-size: 0.78rem;
+        color: #777;
+        margin-top: 0.1rem;
+    }
+
+    /* Season chips — inline pill tags */
+    .season-group-label {
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: #555;
+        margin: 0.6rem 0 0.3rem 0;
+    }
+    .season-group-label:first-child { margin-top: 0; }
+    .season-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+    }
+    .season-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        background: #E8F5E9;
+        border: 1px solid #C8E6C9;
+        border-radius: 999px;
+        padding: 0.3rem 0.75rem;
+        font-size: 0.82rem;
+    }
+    .season-chip .sc-code {
+        font-weight: 700;
+        color: #1B5E20;
+    }
+    .season-chip .sc-months {
+        color: #666;
+        font-size: 0.75rem;
+    }
+
     /* Push main content up so footer doesn't overlap */
     .main .block-container {
         padding-bottom: 2.5rem;
@@ -246,7 +297,7 @@ def inject_css():
         z-index: 999;
     }
     </style>
-    """, unsafe_allow_html=True)
+    """)
 
 
 def sidebar_branding(page_id=None):
@@ -268,7 +319,7 @@ def sidebar_branding(page_id=None):
         st.caption("GMet Sub-Seasonal to Seasonal Forecasts")
 
         # MAIN MENU section
-        st.markdown('<p class="sidebar-section">Main Menu</p>', unsafe_allow_html=True)
+        st.html('<p class="sidebar-section">Main Menu</p>')
         st.page_link("app.py", label="Dashboard")
 
         with st.expander("Agronomic Forecasts", expanded=(page_id == "agronomic")):
@@ -307,7 +358,7 @@ def sidebar_branding(page_id=None):
             st.page_link("pages/03_Temperature_Outlook.py", label=f"{_check('temperature', 'product', 'NDJ')} NDJ", query_params={"product": "NDJ"})
 
         # ANALYSIS section
-        st.markdown('<p class="sidebar-section">Analysis</p>', unsafe_allow_html=True)
+        st.html('<p class="sidebar-section">Analysis</p>')
 
         with st.expander("Forecast Skill", expanded=(page_id == "skill")):
             st.page_link("pages/04_Forecast_Skill.py", label=f"{_check('skill', 'metric', 'GROC')} GROC", query_params={"metric": "GROC"})
@@ -316,12 +367,22 @@ def sidebar_branding(page_id=None):
             st.page_link("pages/04_Forecast_Skill.py", label=f"{_check('skill', 'metric', 'RPSS')} RPSS", query_params={"metric": "RPSS"})
 
         with st.expander("Station Data", expanded=(page_id == "station")):
+            st.caption("Agronomic Indices")
             st.page_link("pages/05_Station_Data.py", label=f"{_check('station', 'product', 'onset')} Onset", query_params={"product": "onset"})
-            st.page_link("pages/05_Station_Data.py", label=f"{_check('station', 'product', 'dry_spell')} Dry Spell", query_params={"product": "dry_spell"})
-            st.page_link("pages/05_Station_Data.py", label=f"{_check('station', 'product', 'seasonal_prcp')} Seasonal PRCP", query_params={"product": "seasonal_prcp"})
+            st.page_link("pages/05_Station_Data.py", label=f"{_check('station', 'product', 'dry_spell')} 1st Dry Spell", query_params={"product": "dry_spell"})
+            st.page_link("pages/05_Station_Data.py", label=f"{_check('station', 'product', 'late_dry_spell')} Late Dry Spell", query_params={"product": "late_dry_spell"})
+            st.page_link("pages/05_Station_Data.py", label=f"{_check('station', 'product', 'cessation')} Cessation", query_params={"product": "cessation"})
+            st.caption("Seasonal Rainfall")
+            st.page_link("pages/05_Station_Data.py", label=f"{_check('station', 'product', 'MAM')} MAM", query_params={"product": "MAM"})
+            st.page_link("pages/05_Station_Data.py", label=f"{_check('station', 'product', 'AMJ')} AMJ", query_params={"product": "AMJ"})
+            st.page_link("pages/05_Station_Data.py", label=f"{_check('station', 'product', 'MJJ')} MJJ", query_params={"product": "MJJ"})
+            st.page_link("pages/05_Station_Data.py", label=f"{_check('station', 'product', 'JJA')} JJA", query_params={"product": "JJA"})
+            st.page_link("pages/05_Station_Data.py", label=f"{_check('station', 'product', 'JAS')} JAS", query_params={"product": "JAS"})
+            st.page_link("pages/05_Station_Data.py", label=f"{_check('station', 'product', 'SON')} SON", query_params={"product": "SON"})
+            st.page_link("pages/05_Station_Data.py", label=f"{_check('station', 'product', 'DJF')} DJF", query_params={"product": "DJF"})
 
         # HELP section
-        st.markdown('<p class="sidebar-section">Help</p>', unsafe_allow_html=True)
+        st.html('<p class="sidebar-section">Help</p>')
         st.page_link("pages/06_Glossary.py", label="Glossary")
 
         st.markdown("---")
@@ -336,14 +397,14 @@ def info_bar(items, accent="#1B5E20"):
         f'</div>'
         for label, value in items
     )
-    st.markdown(f'<div class="info-bar">{inner}</div>', unsafe_allow_html=True)
+    st.html(f'<div class="info-bar">{inner}</div>')
 
 
 def section_heading(title, caption=None):
     """Styled section heading with optional caption."""
-    st.markdown(f'<div class="section-heading">{title}</div>', unsafe_allow_html=True)
+    st.html(f'<div class="section-heading">{title}</div>')
     if caption:
-        st.markdown(f'<div class="section-caption">{caption}</div>', unsafe_allow_html=True)
+        st.html(f'<div class="section-caption">{caption}</div>')
 
 
 def status_badge(text):
@@ -353,7 +414,7 @@ def status_badge(text):
 
 def page_header(title: str, subtitle: str, accent: str):
     """Render a gradient banner at the top of a page."""
-    st.markdown(f"""
+    st.html(f"""
     <div class="page-banner" style="
         background: linear-gradient(135deg, {accent}, {_lighten(accent, 0.3)});
         padding: 1.5rem 2rem;
@@ -368,7 +429,7 @@ def page_header(title: str, subtitle: str, accent: str):
             {subtitle}
         </p>
     </div>
-    """, unsafe_allow_html=True)
+    """)
 
 
 def metric_cards(values: list[tuple[str, str]], accent: str, light_bg: str):
@@ -376,13 +437,13 @@ def metric_cards(values: list[tuple[str, str]], accent: str, light_bg: str):
     cols = st.columns(len(values))
     for col, (label, val) in zip(cols, values):
         with col:
-            st.markdown(f"""
+            st.html(f"""
             <div class="metric-card" style="--accent:{accent}; --light-bg:{light_bg};
                  border-left-color:{accent}; background:{light_bg};">
                 <div class="value" style="color:{accent};">{val}</div>
                 <div class="label">{label}</div>
             </div>
-            """, unsafe_allow_html=True)
+            """)
 
 
 def about_product(description: str, farmer_guidance: str):
@@ -390,22 +451,28 @@ def about_product(description: str, farmer_guidance: str):
     with st.expander("About This Product", expanded=False):
         st.markdown(description)
         if farmer_guidance:
-            st.markdown(f"""
+            st.html(f"""
             <div class="farmer-tip">
                 <strong>Advisory Guidance for Farmers:</strong> {farmer_guidance}
             </div>
-            """, unsafe_allow_html=True)
+            """)
 
 
 def footer():
     """Render page footer."""
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
-    st.markdown(f"""
-    <div class="app-footer">
+    st.html(f"""
+    <div style="
+        position: fixed; bottom: 0; left: 0; right: 0;
+        text-align: center; padding: 0.3rem 0; color: #AAA;
+        font-size: 0.65rem; background: #FAFAFA;
+        border-top: 1px solid #E8E8E8; z-index: 999;
+        font-family: 'Source Sans Pro', sans-serif;
+    ">
         <strong>Ghana Meteorological Agency (GMet)</strong> | CILSS/AGRHYMET Regional Climate Centre | WASS2S Forecast System<br>
         <span style="font-size:0.65rem;">Rendered {now} UTC</span>
     </div>
-    """, unsafe_allow_html=True)
+    """)
 
 
 def disclaimer(description: str = None, farmer_guidance: str = None):
@@ -421,7 +488,7 @@ def disclaimer(description: str = None, farmer_guidance: str = None):
     if product_html:
         product_html += "<hr style='border:none;border-top:1px solid #E0D8A8;margin:0.5rem 0;'>"
 
-    st.markdown(f"""
+    st.html(f"""
     <div style="
         background: #FFFDE7;
         border-left: 4px solid #F9A825;
@@ -431,6 +498,7 @@ def disclaimer(description: str = None, farmer_guidance: str = None):
         margin-bottom: 1rem;
         font-size: 0.82rem;
         color: #555;
+        font-family: 'Source Sans Pro', sans-serif;
     ">
         {product_html}
         <strong style="color:#E65100;">Disclaimer:</strong>
@@ -440,7 +508,7 @@ def disclaimer(description: str = None, farmer_guidance: str = None):
         forecasts. Users are advised to consult GMet extension services for location-specific
         guidance. Forecast skill varies by region, season, and lead time.
     </div>
-    """, unsafe_allow_html=True)
+    """)
 
 
 def _lighten(hex_color: str, amount: float = 0.3) -> str:

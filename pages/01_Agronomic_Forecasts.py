@@ -2,10 +2,11 @@ import streamlit as st
 import sys
 from pathlib import Path
 
-st.set_page_config(page_title="Agronomic Forecasts", page_icon="\U0001F331", layout="wide")
+_logo_path = Path(__file__).parent.parent / "assets" / "smart_logo_GMet.png"
+st.set_page_config(page_title="Agronomic Forecasts", page_icon=str(_logo_path) if _logo_path.exists() else None, layout="wide")
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from utils import inject_css, sidebar_branding, page_header, metric_cards, about_product, footer
+from utils import inject_css, sidebar_branding, metric_cards, footer, disclaimer
 from utils.product_config import get_product
 from utils.charts import forecast_heatmap, dominant_tercile_map
 from utils.data_loader import (
@@ -14,37 +15,16 @@ from utils.data_loader import (
     get_metadata, pdf_to_image,
 )
 
-# --- Product registry for this page ---
-AGRO_PRODUCTS = [
-    ("onset", "Onset"),
-    ("dry_spell", "1st Dry Spell"),
-    ("late_dry_spell", "Late Dry Spell"),
-    ("cessation", "Cessation"),
-    ("length_of_season", "Season Length"),
-]
+AGRO_KEYS = ["onset", "dry_spell", "late_dry_spell", "cessation", "length_of_season"]
 
 inject_css()
-sidebar_branding()
+sidebar_branding(page_id="agronomic")
 
-page_header("Agronomic Forecasts", "Seasonal agronomic forecast products for Ghana", "#2E7D32", "\U0001F331")
-
-# --- Product selector ---
-product_labels = [label for _, label in AGRO_PRODUCTS]
-product_keys = [key for key, _ in AGRO_PRODUCTS]
-
-qp = st.query_params.get("product", None)
-default_idx = product_keys.index(qp) if qp in product_keys else 0
-
-selected_label = st.selectbox("Select Product", product_labels, index=default_idx,
-                              label_visibility="collapsed")
-product_key = AGRO_PRODUCTS[product_labels.index(selected_label)][0]
+qp = st.query_params.get("product", "onset")
+product_key = qp if qp in AGRO_KEYS else "onset"
 P = get_product(product_key)
 
-# --- About this product ---
-about_product(P["description"], P["farmer_guidance"])
-
 # ─── Consolidated Forecast ───
-st.markdown("---")
 st.markdown("### Consolidated Forecast")
 
 forecast_type = st.radio("Forecast Type", ["Deterministic", "Probabilistic"], horizontal=True)
@@ -72,12 +52,14 @@ if forecast_type == "Deterministic":
             fig = forecast_heatmap(
                 data.values, lon, lat, P["colorscale"], P["colorbar_title"],
                 f"Consolidated {P['short']} Forecast (Deterministic)",
+                forecast_year=forecast_year,
+                use_week_labels=P.get("use_week_labels", False),
             )
             st.plotly_chart(fig, use_container_width=True)
             stats = compute_stats(data)
             if stats[0] is not None:
                 metric_cards(
-                    [(lbl, format_metric(P["metric_fmt"], v))
+                    [(lbl, format_metric(P["metric_fmt"], v, forecast_year=forecast_year))
                      for lbl, v in zip(P["metric_labels"], stats)],
                     P["accent"], P["light_bg"],
                 )
@@ -103,6 +85,7 @@ else:
                 categories, lon, lat,
                 f"Consolidated {P['short']} Forecast (Probabilistic)",
                 reverse_cmap=P.get("reverse_cmap", False),
+                category_labels=P.get("category_labels"),
             )
             st.plotly_chart(fig, use_container_width=True)
     else:
@@ -124,19 +107,29 @@ else:
 
 # ─── Section 3: Individual Model Forecasts ───
 st.markdown("---")
-st.markdown("### Individual Model Forecasts")
+from utils import section_heading
+section_heading("Individual Model Forecasts", caption="Browse outputs from each contributing climate model")
 
 pdf_files = find_forecast_files(product_key, "pdf")
 if pdf_files:
     model_names = [f.stem for f in pdf_files]
-    selected_model = st.selectbox("Select Model", model_names)
+    col_select, col_dl = st.columns([3, 1], vertical_alignment="bottom")
+    with col_select:
+        selected_model = st.selectbox("Select Model", model_names, label_visibility="collapsed")
     selected_pdf = pdf_files[model_names.index(selected_model)]
-    with open(selected_pdf, "rb") as f:
-        st.download_button(
-            f"Download {selected_model}.pdf",
-            f.read(), f"{selected_model}.pdf", "application/pdf",
-        )
+    with col_dl:
+        with open(selected_pdf, "rb") as f:
+            st.download_button(
+                "Download PDF", f.read(), f"{selected_model}.pdf",
+                "application/pdf", use_container_width=True,
+            )
+    # Render selected PDF as image
+    png_bytes = pdf_to_image(str(selected_pdf))
+    if png_bytes:
+        _, img_col, _ = st.columns([1, 2, 1])
+        img_col.image(png_bytes, caption=f"{selected_model}", use_container_width=True)
 else:
     st.info(f"No individual model PDFs found for {P['short']}.")
 
+disclaimer(P["description"], P["farmer_guidance"])
 footer()

@@ -280,10 +280,19 @@ def compute_stats(data) -> list[float]:
     return [float(np.nanmin(valid)), float(np.nanmean(valid)), float(np.nanmax(valid))]
 
 
-def format_metric(fmt: str, value: float) -> str:
-    """Format a metric value using the product's format string."""
+def format_metric(fmt: str, value: float, forecast_year: int = None) -> str:
+    """Format a metric value using the product's format string.
+
+    When fmt == "week", converts a day-of-year value to 'Wk2 May' format.
+    """
     if value is None:
         return "\u2014"
+    if fmt == "week":
+        from datetime import date, timedelta
+        year = forecast_year or 2026
+        d = date(year, 1, 1) + timedelta(days=int(value) - 1)
+        week_num = (d.day - 1) // 7 + 1
+        return f"Wk{week_num} {d.strftime('%b')}"
     if "{:.0f}" in fmt or "{:.1f}" in fmt:
         return fmt.format(value)
     return fmt.format(int(value))
