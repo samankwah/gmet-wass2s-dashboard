@@ -1,5 +1,6 @@
 """Cached NetCDF/CSV loading with auto-detection of Agro_PRESAGG data directories."""
 
+import os
 import re
 import zipfile
 import tempfile
@@ -16,6 +17,15 @@ DATA_DIR = Path("/tmp/wass2s_data")  # Writable on Streamlit Cloud
 
 GITHUB_REPO = "samankwah/gmet-wass2s-dashboard"
 RELEASE_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
+
+
+def _gh_headers() -> dict:
+    """Build request headers with GitHub token if available (raises rate limit)."""
+    token = os.environ.get("GITHUB_TOKEN") or st.secrets.get("GITHUB_TOKEN", "")
+    headers = {"Accept": "application/vnd.github+json"}
+    if token:
+        headers["Authorization"] = f"token {token}"
+    return headers
 
 _AGRO_PATTERN = re.compile(r"Agro_PRESAGG_(\d+)_ic_(\d+)")
 
@@ -43,7 +53,8 @@ def _download_release_data():
         return
 
     try:
-        resp = requests.get(RELEASE_API_URL, timeout=30)
+        headers = _gh_headers()
+        resp = requests.get(RELEASE_API_URL, headers=headers, timeout=30)
         resp.raise_for_status()
         release = resp.json()
 
@@ -62,7 +73,7 @@ def _download_release_data():
         DATA_DIR.mkdir(parents=True, exist_ok=True)
         with tempfile.NamedTemporaryFile(suffix=".zip", delete=False, dir="/tmp") as tmp:
             tmp_path = tmp.name
-            with requests.get(zip_url, timeout=600, stream=True) as dl:
+            with requests.get(zip_url, headers=headers, timeout=600, stream=True) as dl:
                 dl.raise_for_status()
                 for chunk in dl.iter_content(chunk_size=8 * 1024 * 1024):
                     tmp.write(chunk)
