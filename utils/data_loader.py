@@ -21,7 +21,12 @@ RELEASE_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 
 def _gh_headers() -> dict:
     """Build request headers with GitHub token if available (raises rate limit)."""
-    token = os.environ.get("GITHUB_TOKEN") or st.secrets.get("GITHUB_TOKEN", "")
+    token = os.environ.get("GITHUB_TOKEN", "")
+    if not token:
+        try:
+            token = st.secrets["GITHUB_TOKEN"]
+        except (KeyError, FileNotFoundError):
+            token = ""
     headers = {"Accept": "application/vnd.github+json"}
     if token:
         headers["Authorization"] = f"token {token}"
