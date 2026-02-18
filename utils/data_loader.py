@@ -1,6 +1,5 @@
 """Cached NetCDF/CSV loading with auto-detection of Agro_PRESAGG data directories."""
 
-import os
 import re
 import zipfile
 import tempfile
@@ -16,21 +15,9 @@ PROJECT_ROOT = APP_DIR.parent
 DATA_DIR = Path("/tmp/wass2s_data")  # Writable on Streamlit Cloud
 
 GITHUB_REPO = "samankwah/gmet-wass2s-dashboard"
-RELEASE_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-
-
-def _gh_headers() -> dict:
-    """Build request headers with GitHub token if available (raises rate limit)."""
-    token = os.environ.get("GITHUB_TOKEN", "")
-    if not token:
-        try:
-            token = st.secrets["GITHUB_TOKEN"]
-        except (KeyError, FileNotFoundError):
-            token = ""
-    headers = {"Accept": "application/vnd.github+json"}
-    if token:
-        headers["Authorization"] = f"token {token}"
-    return headers
+RELEASE_TAG = "data-2026-ic1"
+ZIP_FILENAME = "Agro_PRESAGG_2026_ic_1.zip"
+DOWNLOAD_URL = f"https://github.com/{GITHUB_REPO}/releases/download/{RELEASE_TAG}/{ZIP_FILENAME}"
 
 _AGRO_PATTERN = re.compile(r"Agro_PRESAGG_(\d+)_ic_(\d+)")
 
@@ -58,27 +45,11 @@ def _download_release_data():
         return
 
     try:
-        headers = _gh_headers()
-        resp = requests.get(RELEASE_API_URL, headers=headers, timeout=30)
-        resp.raise_for_status()
-        release = resp.json()
-
-        # Find the first .zip asset
-        zip_url = None
-        for asset in release.get("assets", []):
-            if asset["name"].endswith(".zip"):
-                zip_url = asset["browser_download_url"]
-                break
-
-        if zip_url is None:
-            st.error("No data zip found in latest GitHub release.")
-            return
-
-        # Download the zip to a temp file (avoids loading 200MB+ into RAM)
+        # Direct download URL — no API call, no rate limit, no token needed
         DATA_DIR.mkdir(parents=True, exist_ok=True)
         with tempfile.NamedTemporaryFile(suffix=".zip", delete=False, dir="/tmp") as tmp:
             tmp_path = tmp.name
-            with requests.get(zip_url, headers=headers, timeout=600, stream=True) as dl:
+            with requests.get(DOWNLOAD_URL, timeout=600, stream=True) as dl:
                 dl.raise_for_status()
                 for chunk in dl.iter_content(chunk_size=8 * 1024 * 1024):
                     tmp.write(chunk)
